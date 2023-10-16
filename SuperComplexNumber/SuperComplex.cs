@@ -143,6 +143,53 @@ public struct SuperComplex
         var result = V*identity*VInverse;
         return new(result);
     }
+    /// <summary>
+    /// Applies function to super complex number, yeah, complex valued result is sufficient.<br/>
+    /// For example: to compute sin of super complex number just put Complex.Sin in this method, and
+    /// it will apply sin function to whole super complex number
+    /// </summary>
+    public SuperComplex ApplyOnSuperComplex(Func<SuperComplex,SuperComplex> func){
+        var mat = ToMatrix();
+        var a = mat[0,0];
+        var b = mat[0,1];
+        var c = mat[1,0];
+        var d = mat[1,1];
+
+        SuperComplex D = Complex.Sqrt((a+d)*(a+d)-4*(a*d-c*b));
+        if(D.Magnitude==0)
+            D=theta;
+        //eigenvalues 
+        var k1 = (a+d+D)/2;
+        var k2 = (a+d-D)/2;
+
+        //eigenvectors first dimension. Second is 1
+        var v1 = b/(k1-a);
+        var v2 = b/(k2-a);
+
+        //eigenvectors matrix
+        var V = MathNet.Numerics.LinearAlgebra.Double.DenseMatrix.Create(4,4,0);
+        V.SetSubMatrix(0,0,v1);
+        V.SetSubMatrix(0,2,v2);
+        V.SetSubMatrix(2,0,real);
+        V.SetSubMatrix(2,2,real);
+
+        //eigenvectors matrix inverse
+        var VInverse = MathNet.Numerics.LinearAlgebra.Double.DenseMatrix.Create(4,4,0);
+        var det = 1.0/(v1-v2);
+        VInverse.SetSubMatrix(0,0,real*det.ToMatrix());
+        VInverse.SetSubMatrix(0,2,-v2*det);
+        VInverse.SetSubMatrix(2,0,-real*det.ToMatrix());
+        VInverse.SetSubMatrix(2,2,v1*det);
+
+        //identity of eigenvalues that is used to compute function of any matrix
+        var identity = MathNet.Numerics.LinearAlgebra.Double.DenseMatrix.Create(4,4,0);
+        identity.SetSubMatrix(0,0,func(k1));
+        identity.SetSubMatrix(2,2,func(k2));
+
+        //result by eigenvectors decomposition
+        var result = V*identity*VInverse;
+        return new(castToCoefficientsBigMatrix(result));
+    }
     double[] castToCoefficients(Complex[] coefficients)
     {
         Matrix<double> total = DenseMatrix.Create(2, 2, 0);
@@ -151,6 +198,26 @@ public struct SuperComplex
         total += (coefficients[2].Real * real - coefficients[2].Imaginary * imaginary) * theta;
         total += (coefficients[3].Real * real - coefficients[3].Imaginary * imaginary) * mu;
         return castToCoefficients(total);
+    }
+    double[] castToCoefficients(SuperComplex[] coefficients)
+    {
+        SuperComplex total = DenseMatrix.Create(2, 2, 0);
+        var part = new SuperComplex[]{real,imaginary,theta,mu};
+        foreach(var (coef,complexPart) in coefficients.Zip(part))
+            total+=coef*complexPart;
+        return total.Coefficients;
+    }
+    double[] castToCoefficientsBigMatrix(Matrix<double> val){
+        SuperComplex a = val.SubMatrix(0,2, 0,2);
+        SuperComplex b = val.SubMatrix(0,2, 2,2);
+        SuperComplex c = val.SubMatrix(2,2, 0,2);
+        SuperComplex d = val.SubMatrix(2,2, 2,2);
+
+        var k1 = (a + d) / 2;
+        var k2 = (a - d - 5 * b - 3 * c) / 2;
+        var k3 = (a - d) / 2 - b - c;
+        var k4 = (b + c) / 2;
+        return castToCoefficients(new[] { k1, k2, k3, k4 });
     }
     double[] castToCoefficients(Matrix<Complex> val)
     {
