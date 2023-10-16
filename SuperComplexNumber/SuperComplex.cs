@@ -178,10 +178,13 @@ public struct SuperComplex
     static Matrix<double> real = Real;
     static Matrix<double> theta = Theta;
     static Matrix<double> mu = Mu;
-    public override string ToString()
+    public override string ToString(){
+        return ToString();
+    }
+    public string ToString(string? numbersFormat = null)
     {
         char sign(double val)=>val>=0 ? '+' : '-';
-        return $"({Coefficients[0]} {sign(Coefficients[1])} {Math.Abs(Coefficients[1])}i {sign(Coefficients[2])} {Math.Abs(Coefficients[2])}θ {sign(Coefficients[3])} {Math.Abs(Coefficients[3])}μ)";
+        return $"({Coefficients[0].ToString(numbersFormat)} {sign(Coefficients[1])} {Math.Abs(Coefficients[1]).ToString(numbersFormat)}i {sign(Coefficients[2])} {Math.Abs(Coefficients[2]).ToString(numbersFormat)}θ {sign(Coefficients[3])} {Math.Abs(Coefficients[3]).ToString(numbersFormat)}μ)";
     }
     /// <summary>
     /// i^2=-1
