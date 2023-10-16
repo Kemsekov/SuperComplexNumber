@@ -124,17 +124,21 @@ public struct SuperComplex
         var V = MathNet.Numerics.LinearAlgebra.Complex.DenseMatrix.Create(2,2,1);
         V[0,0]=v1;
         V[0,1]=v2;
+
+        //eigenvectors matrix inverse
         var VInverse = MathNet.Numerics.LinearAlgebra.Complex.DenseMatrix.Create(2,2,0);
         VInverse[0,0]=1;
         VInverse[0,1]=-v2;
         VInverse[1,0]=-1;
         VInverse[1,1]=v1;
-
         VInverse*=1.0/(v1-v2);
 
+        //identity of eigenvalues that is used to compute function of any matrix
         var identity = MathNet.Numerics.LinearAlgebra.Complex.DenseMatrix.Create(2,2,0);
         identity[0,0]=func(k1);
         identity[1,1]=func(k2);
+
+        //result by eigenvectors decomposition
         var result = V*identity*VInverse;
         return new(result);
     }
