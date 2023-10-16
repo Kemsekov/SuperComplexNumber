@@ -98,6 +98,7 @@ public struct SuperComplex
         var result = s1.ToMatrix() * s2.ToMatrix().Inverse();
         return new(result);
     }
+    public double Magnitude => Math.Sqrt(Coefficients.Sum(x=>x*x));
     /// <summary>
     /// Applies function to super complex number, yeah, complex valued result is sufficient.<br/>
     /// For example: to compute sin of super complex number just put Complex.Sin in this method, and
