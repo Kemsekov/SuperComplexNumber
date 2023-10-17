@@ -1,5 +1,6 @@
 
 using System.Numerics;
+using MathNet.Numerics;
 using MathNet.Numerics.LinearAlgebra;
 using MathNet.Numerics.LinearAlgebra.Double;
 
@@ -23,6 +24,10 @@ public struct SuperComplex
     {
         Coefficients = castToCoefficients(coefficients);
     }
+    public SuperComplex(SuperComplex[] coefficients)
+    {
+        Coefficients = castToCoefficients(coefficients);
+    }
     public SuperComplex(Matrix<double> value)
     {
         Coefficients = castToCoefficients(value);
@@ -35,11 +40,16 @@ public struct SuperComplex
     {
         return real * Coefficients[0] + imaginary * Coefficients[1] + theta * Coefficients[2] + mu * Coefficients[3];
     }
+    public Complex ToComplex() => new(Coefficients[0], Coefficients[1]);
     public static implicit operator Matrix<double>(SuperComplex val)
     {
         return val.ToMatrix();
     }
     public static implicit operator SuperComplex(double[] coef)
+    {
+        return new(coef);
+    }
+    public static implicit operator SuperComplex(SuperComplex[] coef)
     {
         return new(coef);
     }
@@ -95,101 +105,88 @@ public struct SuperComplex
     //TODO add function transformation and check if this operation is consistent with function 1/Complex
     public static SuperComplex operator /(SuperComplex s1, SuperComplex s2)
     {
+        if (s1.Magnitude == 0) return new(new[] { 0.0, 0, 0, 0 });
         var result = s1.ToMatrix() * s2.ToMatrix().Inverse();
         return new(result);
     }
-    public double Magnitude => Math.Sqrt(Coefficients.Sum(x=>x*x));
+    public double Magnitude => Math.Sqrt(Coefficients.Sum(x => x * x));
     /// <summary>
-    /// Applies function to super complex number, yeah, complex valued result is sufficient.<br/>
-    /// For example: to compute sin of super complex number just put Complex.Sin in this method, and
-    /// it will apply sin function to whole super complex number
+    /// Applies function by analytic continuation to super complex number from real plane space.<br/>
+    /// Not all functions can be mapped in such way, when mapping is failed it returns <see cref="double.Nan"/> 
     /// </summary>
-    public SuperComplex Apply(Func<Complex,Complex> func){
+    public SuperComplex ApplyReal(Func<double, double> func)
+    {
+        return ApplyComplex(c=>{
+            if(c.Imaginary!=0) return double.NaN;
+            return func(c.Real);
+        });
+    }
+    /// <summary>
+    /// Applies function by analytic continuation to super complex number from real complex space.<br/>
+    /// Can work with a lot more values from super complex plane.<br/>
+    /// Not all functions can be mapped in such way, when mapping is failed it returns <see cref="double.Nan"/> 
+    /// </summary>
+    public SuperComplex ApplyComplex(Func<Complex, Complex> func)
+    {
         var mat = ToMatrix();
-        var a = mat[0,0];
-        var b = mat[0,1];
-        var c = mat[1,0];
-        var d = mat[1,1];
+        var a = mat[0, 0];
+        var b = mat[0, 1];
+        var c = mat[1, 0];
+        var d = mat[1, 1];
 
-        var D = Complex.Sqrt((a+d)*(a+d)-4*(a*d-c*b));
-        
+        var D = Complex.Sqrt((a + d) * (a + d) - 4 * (a * d - c * b));
+
         //eigenvalues 
-        var k1 = (a+d+D)/2;
-        var k2 = (a+d-D)/2;
+        var k1 = (a + d + D) / 2;
+        var k2 = (a + d - D) / 2;
 
         //eigenvectors first dimension. Second is 1
-        var v1 = b/(k1-a);
-        var v2 = b/(k2-a);
+        var v1 = GetEigenvector(a,b,c,d,k1,1);
+        var v2 = GetEigenvector(a,b,c,d,k2,2);
 
         //eigenvectors matrix
-        var V = MathNet.Numerics.LinearAlgebra.Complex.DenseMatrix.Create(2,2,1);
-        V[0,0]=v1;
-        V[0,1]=v2;
+        var V = MathNet.Numerics.LinearAlgebra.Complex.DenseMatrix.Create(2, 2, 1);
+        V[0, 0] = v1[0];
+        V[1, 0] = v1[1];
+        
+        V[0, 1] = v2[0];
+        V[1, 1] = v2[1];
 
         //eigenvectors matrix inverse
-        var VInverse = MathNet.Numerics.LinearAlgebra.Complex.DenseMatrix.Create(2,2,0);
-        VInverse[0,0]=1;
-        VInverse[0,1]=-v2;
-        VInverse[1,0]=-1;
-        VInverse[1,1]=v1;
-        VInverse*=1.0/(v1-v2);
+        var VInverse = V.Inverse();
 
         //identity of eigenvalues that is used to compute function of any matrix
-        var identity = MathNet.Numerics.LinearAlgebra.Complex.DenseMatrix.Create(2,2,0);
-        identity[0,0]=func(k1);
-        identity[1,1]=func(k2);
+        var identity = MathNet.Numerics.LinearAlgebra.Complex.DenseMatrix.Create(2, 2, 0);
+        identity[0, 0] = func(k1);
+        identity[1, 1] = func(k2);
 
         //result by eigenvectors decomposition
-        var result = V*identity*VInverse;
+        var result = V * identity * VInverse;
         return new(result);
     }
-    /// <summary>
-    /// Applies function to super complex number, yeah, complex valued result is sufficient.<br/>
-    /// For example: to compute sin of super complex number just put Complex.Sin in this method, and
-    /// it will apply sin function to whole super complex number
-    /// </summary>
-    public SuperComplex ApplyOnSuperComplex(Func<SuperComplex,SuperComplex> func){
-        var mat = ToMatrix();
-        var a = mat[0,0];
-        var b = mat[0,1];
-        var c = mat[1,0];
-        var d = mat[1,1];
 
-        SuperComplex D = Complex.Sqrt((a+d)*(a+d)-4*(a*d-c*b));
-        if(D.Magnitude==0)
-            D=theta;
-        //eigenvalues 
-        var k1 = (a+d+D)/2;
-        var k2 = (a+d-D)/2;
+    private Complex[] GetEigenvector(double a, double b, double c, double d, Complex k, int kIndex)
+    {
+        var ak_mag = (a - k).Magnitude;
+        var Ax1 = b / (k - a);
+        var Ax2 = (k - a) / b;
 
-        //eigenvectors first dimension. Second is 1
-        var v1 = b/(k1-a);
-        var v2 = b/(k2-a);
+        if (kIndex % 2 == 0)
+            if (!Ax1.IsNaN())
+                return new[] { Ax1, 1 };
+        if (!Ax2.IsNaN())
+            return new[] { 1, Ax2 };
+        var Bx1 = (k - d) / c;
+        var Bx2 = c / (k - d);
+        if (kIndex % 2 == 0)
+            if (!Bx1.IsNaN())
+                return new[] { Bx1, 1 };
+        if (!Bx2.IsNaN())
+            return new[] { 1, Bx2 };
 
-        //eigenvectors matrix
-        var V = MathNet.Numerics.LinearAlgebra.Double.DenseMatrix.Create(4,4,0);
-        V.SetSubMatrix(0,0,v1);
-        V.SetSubMatrix(0,2,v2);
-        V.SetSubMatrix(2,0,real);
-        V.SetSubMatrix(2,2,real);
-
-        //eigenvectors matrix inverse
-        var VInverse = MathNet.Numerics.LinearAlgebra.Double.DenseMatrix.Create(4,4,0);
-        var det = 1.0/(v1-v2);
-        VInverse.SetSubMatrix(0,0,real*det.ToMatrix());
-        VInverse.SetSubMatrix(0,2,-v2*det);
-        VInverse.SetSubMatrix(2,0,-real*det.ToMatrix());
-        VInverse.SetSubMatrix(2,2,v1*det);
-
-        //identity of eigenvalues that is used to compute function of any matrix
-        var identity = MathNet.Numerics.LinearAlgebra.Double.DenseMatrix.Create(4,4,0);
-        identity.SetSubMatrix(0,0,func(k1));
-        identity.SetSubMatrix(2,2,func(k2));
-
-        //result by eigenvectors decomposition
-        var result = V*identity*VInverse;
-        return new(castToCoefficientsBigMatrix(result));
+        throw new Exception("bro =(");
     }
+
     double[] castToCoefficients(Complex[] coefficients)
     {
         Matrix<double> total = DenseMatrix.Create(2, 2, 0);
@@ -202,16 +199,17 @@ public struct SuperComplex
     double[] castToCoefficients(SuperComplex[] coefficients)
     {
         SuperComplex total = DenseMatrix.Create(2, 2, 0);
-        var part = new SuperComplex[]{real,imaginary,theta,mu};
-        foreach(var (coef,complexPart) in coefficients.Zip(part))
-            total+=coef*complexPart;
+        var part = new SuperComplex[] { real, imaginary, theta, mu };
+        foreach (var (coef, complexPart) in coefficients.Zip(part))
+            total += coef * complexPart;
         return total.Coefficients;
     }
-    double[] castToCoefficientsBigMatrix(Matrix<double> val){
-        SuperComplex a = val.SubMatrix(0,2, 0,2);
-        SuperComplex b = val.SubMatrix(0,2, 2,2);
-        SuperComplex c = val.SubMatrix(2,2, 0,2);
-        SuperComplex d = val.SubMatrix(2,2, 2,2);
+    double[] castToCoefficientsBigMatrix(Matrix<double> val)
+    {
+        SuperComplex a = val.SubMatrix(0, 2, 0, 2);
+        SuperComplex b = val.SubMatrix(0, 2, 2, 2);
+        SuperComplex c = val.SubMatrix(2, 2, 0, 2);
+        SuperComplex d = val.SubMatrix(2, 2, 2, 2);
 
         var k1 = (a + d) / 2;
         var k2 = (a - d - 5 * b - 3 * c) / 2;
@@ -250,12 +248,13 @@ public struct SuperComplex
     static Matrix<double> real = Real;
     static Matrix<double> theta = Theta;
     static Matrix<double> mu = Mu;
-    public override string ToString(){
+    public override string ToString()
+    {
         return ToString();
     }
     public string ToString(string? numbersFormat = null)
     {
-        char sign(double val)=>val>=0 ? '+' : '-';
+        char sign(double val) => val >= 0 ? '+' : '-';
         return $"({Coefficients[0].ToString(numbersFormat)} {sign(Coefficients[1])} {Math.Abs(Coefficients[1]).ToString(numbersFormat)}i {sign(Coefficients[2])} {Math.Abs(Coefficients[2]).ToString(numbersFormat)}θ {sign(Coefficients[3])} {Math.Abs(Coefficients[3]).ToString(numbersFormat)}μ)";
     }
     /// <summary>
