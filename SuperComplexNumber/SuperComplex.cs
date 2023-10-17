@@ -167,6 +167,7 @@ public struct SuperComplex
 
     private Complex[] GetEigenvector(double a, double b, double c, double d, Complex k, int kIndex)
     {
+        if(kIndex>2) return new Complex[]{0,0};
         var ak_mag = (a - k).Magnitude;
         var Ax1 = b / (k - a);
         var Ax2 = (k - a) / b;
@@ -183,8 +184,7 @@ public struct SuperComplex
                 return new[] { Bx1, 1 };
         if (!Bx2.IsNaN())
             return new[] { 1, Bx2 };
-
-        throw new Exception("bro =(");
+        return GetEigenvector(a,b,c,d,k,kIndex+1);
     }
 
     double[] castToCoefficients(Complex[] coefficients)
