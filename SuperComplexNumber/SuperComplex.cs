@@ -116,9 +116,14 @@ public struct SuperComplex
     public double Magnitude => Math.Sqrt(Coefficients.Sum(x => x * x));
 
     /// <summary>
-    /// Applies function by analytic continuation to super complex number from real complex space.<br/>
-    /// Can work with a lot more values from super complex plane.<br/>
-    /// Not all functions can be mapped in such way, when mapping is failed it returns <see cref="double.Nan"/> 
+    /// Applies function by analytic continuation to super complex number from complex plane.<br/>
+    /// Here is a catch: you may notice that <see cref="Complex.Sqrt"/> results when squared does not
+    /// yield same value that you used to take sqrt, when magnitude of value is > 1<br/>
+    /// This is not mistake, this method indeed generalizes complex functions
+    /// to super complex plane, but it does so ONLY IN CORRESPONDING SERIES CONVERGENCE RADIUS. <br/>
+    /// That is, for sqrt magnitude of input value must be smaller than 1, so when you try to take sqrt of
+    /// anything that is bigger than 1 by magnitude, it will give you wrong results. <br/>
+    /// That's crazy how does math know about series convergence even here, although there is no series used at all.
     /// </summary>
     public SuperComplex ApplyComplex(Func<Complex, Complex> func)
     {
@@ -132,6 +137,7 @@ public struct SuperComplex
 
         var identity = CMatrix.CreateIdentity(2);
         var sqrt = Complex.Sqrt(trace*trace/4-mat.Determinant());
+        //I have no idea why setting it to NaN works, but it does
         if(sqrt==0) sqrt=Complex.NaN;
         var part1 = sum*identity/2;
         var part2 = (A-identity*trace/2)/sqrt*diff/2;
