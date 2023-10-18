@@ -1,9 +1,13 @@
 
+using CMatrix = MathNet.Numerics.LinearAlgebra.Complex.DenseMatrix;
+using CVector = MathNet.Numerics.LinearAlgebra.Complex.DenseVector;
 using System.Numerics;
 using MathNet.Numerics;
 using MathNet.Numerics.LinearAlgebra;
 using MathNet.Numerics.LinearAlgebra.Double;
-
+using System.Linq.Expressions;
+using System.Security.AccessControl;
+using System.Net.Quic;
 public struct SuperComplex
 {
     public double[] Coefficients { get; }
@@ -110,17 +114,7 @@ public struct SuperComplex
         return new(result);
     }
     public double Magnitude => Math.Sqrt(Coefficients.Sum(x => x * x));
-    /// <summary>
-    /// Applies function by analytic continuation to super complex number from real plane space.<br/>
-    /// Not all functions can be mapped in such way, when mapping is failed it returns <see cref="double.Nan"/> 
-    /// </summary>
-    public SuperComplex ApplyReal(Func<double, double> func)
-    {
-        return ApplyComplex(c=>{
-            if(c.Imaginary!=0) return double.NaN;
-            return func(c.Real);
-        });
-    }
+
     /// <summary>
     /// Applies function by analytic continuation to super complex number from real complex space.<br/>
     /// Can work with a lot more values from super complex plane.<br/>
@@ -128,64 +122,23 @@ public struct SuperComplex
     /// </summary>
     public SuperComplex ApplyComplex(Func<Complex, Complex> func)
     {
+        // see https://en.wikipedia.org/wiki/Analytic_function_of_a_matrix
         var mat = ToMatrix();
-        var a = mat[0, 0];
-        var b = mat[0, 1];
-        var c = mat[1, 0];
-        var d = mat[1, 1];
+        var A = CMatrix.Create(2,2,(i,j)=>mat[i,j]);
+        var evd = mat.Evd();
+        var trace = mat.Trace();
+        var sum = func(evd.EigenValues[0])+func(evd.EigenValues[1]);
+        var diff = func(evd.EigenValues[0])-func(evd.EigenValues[1]);
 
-        var D = Complex.Sqrt((a + d) * (a + d) - 4 * (a * d - c * b));
-
-        //eigenvalues 
-        var k1 = (a + d + D) / 2;
-        var k2 = (a + d - D) / 2;
-
-        //eigenvectors first dimension. Second is 1
-        var v1 = GetEigenvector(a,b,c,d,k1,1);
-        var v2 = GetEigenvector(a,b,c,d,k2,2);
-
-        //eigenvectors matrix
-        var V = MathNet.Numerics.LinearAlgebra.Complex.DenseMatrix.Create(2, 2, 1);
-        V[0, 0] = v1[0];
-        V[1, 0] = v1[1];
-        
-        V[0, 1] = v2[0];
-        V[1, 1] = v2[1];
-
-        //eigenvectors matrix inverse
-        var VInverse = V.Inverse();
-
-        //identity of eigenvalues that is used to compute function of any matrix
-        var identity = MathNet.Numerics.LinearAlgebra.Complex.DenseMatrix.Create(2, 2, 0);
-        identity[0, 0] = func(k1);
-        identity[1, 1] = func(k2);
-
-        //result by eigenvectors decomposition
-        var result = V * identity * VInverse;
-        return new(result);
+        var identity = CMatrix.CreateIdentity(2);
+        var sqrt = Complex.Sqrt(trace*trace/4-mat.Determinant());
+        if(sqrt==0) sqrt=Complex.NaN;
+        var part1 = sum*identity/2;
+        var part2 = (A-identity*trace/2)/sqrt*diff/2;
+        var res = part1+part2;
+        return res;
     }
 
-    private Complex[] GetEigenvector(double a, double b, double c, double d, Complex k, int kIndex)
-    {
-        if(kIndex>2) return new Complex[]{0,0};
-        var ak_mag = (a - k).Magnitude;
-        var Ax1 = b / (k - a);
-        var Ax2 = (k - a) / b;
-
-        if (kIndex % 2 == 0)
-            if (!Ax1.IsNaN())
-                return new[] { Ax1, 1 };
-        if (!Ax2.IsNaN())
-            return new[] { 1, Ax2 };
-        var Bx1 = (k - d) / c;
-        var Bx2 = c / (k - d);
-        if (kIndex % 2 == 0)
-            if (!Bx1.IsNaN())
-                return new[] { Bx1, 1 };
-        if (!Bx2.IsNaN())
-            return new[] { 1, Bx2 };
-        return GetEigenvector(a,b,c,d,k,kIndex+1);
-    }
 
     double[] castToCoefficients(Complex[] coefficients)
     {
