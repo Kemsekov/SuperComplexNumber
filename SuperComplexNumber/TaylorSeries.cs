@@ -2,6 +2,9 @@ using System.Numerics;
 using MathNet.Numerics;
 using MathNet.Numerics.Differentiation;
 
+/// <summary>
+/// Taylor series that could be used to generalize real values functions to complex and supercomplex plane
+/// </summary>
 public static class TaylorSeries
 {
     public static double[] BuildSeries(Func<double, double> func, double approximationPoint, int order)
@@ -23,7 +26,7 @@ public static class TaylorSeries
 
     public static double EvaluateSeries(double[] coefficients, double approximationPoint, double x)
     {
-        return Series.Evaluate(coefficients.Select((c, i) => Math.Pow(x, i) * c));
+        return Series.Evaluate(coefficients.Select((c, i) => Math.Pow(x-approximationPoint, i) * c));
     }
 
     public static SuperComplex EvaluateSeriesOnSuperComplex(double[] coefficients, double approximationPoint, SuperComplex x)
