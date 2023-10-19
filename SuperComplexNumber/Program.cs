@@ -1,5 +1,4 @@
 ﻿using System.Numerics;
-using Accord;
 
 var real = SuperComplex.Real;
 var i = SuperComplex.Imaginary;
