@@ -1,6 +1,8 @@
 
-using CMatrix = MathNet.Numerics.LinearAlgebra.Complex.DenseMatrix;
-using CVector = MathNet.Numerics.LinearAlgebra.Complex.DenseVector;
+global using CMatrix = MathNet.Numerics.LinearAlgebra.Complex.DenseMatrix;
+global using DMatrix = MathNet.Numerics.LinearAlgebra.Double.DenseMatrix;
+global using CVector = MathNet.Numerics.LinearAlgebra.Complex.DenseVector;
+global using DVector = MathNet.Numerics.LinearAlgebra.Double.DenseVector;
 using System.Numerics;
 using MathNet.Numerics;
 using MathNet.Numerics.LinearAlgebra;
@@ -131,9 +133,13 @@ public struct SuperComplex
         var mat = ToMatrix();
         var A = CMatrix.Create(2,2,(i,j)=>mat[i,j]);
         var evd = mat.Evd();
+
+        var lp = evd.EigenValues.MaxBy(x=>x.Real);
+        var lm = evd.EigenValues.MinBy(x=>x.Real);
+
         var trace = mat.Trace();
-        var sum = func(evd.EigenValues[0])+func(evd.EigenValues[1]);
-        var diff = func(evd.EigenValues[0])-func(evd.EigenValues[1]);
+        var sum = func(lp)+func(lm);
+        var diff = func(lp)-func(lm);
 
         var identity = CMatrix.CreateIdentity(2);
         var sqrt = Complex.Sqrt(trace*trace/4-mat.Determinant());
