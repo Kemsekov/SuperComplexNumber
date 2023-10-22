@@ -22,12 +22,11 @@ public class TestsTMP
     }
     public static void Sqrt()
     {
-        SuperComplex v = 2 * th + 3 * real + i;
+        SuperComplex v = 3 * real + i+2 * th;
         // v/=v.Magnitude;
         var res = v.ApplyComplex(Complex.Sqrt);
         System.Console.WriteLine(res);
         System.Console.WriteLine("Expect\t" + v.ToString("0.0000"));
         System.Console.WriteLine("Actual\t" + (res * res).ToString("0.0000"));
-
     }
 }

@@ -99,6 +99,19 @@ public struct SuperComplex
             .ToArray()
         );
     }
+    
+    public static bool operator ==(SuperComplex s1,SuperComplex s2){
+        return s1.Coefficients.Zip(s2.Coefficients).Sum(f=>Math.Abs(1-f.First/f.Second))<1e-12;
+    }
+    public static bool operator !=(SuperComplex s1,SuperComplex s2){
+        return s1.Coefficients.Zip(s2.Coefficients).Sum(f=>Math.Abs(1-f.First/f.Second))>=1e-12;
+    }
+    public static bool operator>(SuperComplex s1,SuperComplex s2){
+        return s1.Magnitude>s2.Magnitude;
+    }
+    public static bool operator<(SuperComplex s1,SuperComplex s2){
+        return s1.Magnitude<s2.Magnitude;
+    }
     public static SuperComplex operator -(SuperComplex s)
     {
         return new SuperComplex(s.Coefficients.Select(x => -x).ToArray());
@@ -151,7 +164,6 @@ public struct SuperComplex
         return res;
     }
 
-
     double[] castToCoefficients(Complex[] coefficients)
     {
         Matrix<double> total = DenseMatrix.Create(2, 2, 0);
@@ -169,44 +181,28 @@ public struct SuperComplex
             total += coef * complexPart;
         return total.Coefficients;
     }
-    double[] castToCoefficientsBigMatrix(Matrix<double> val)
-    {
-        SuperComplex a = val.SubMatrix(0, 2, 0, 2);
-        SuperComplex b = val.SubMatrix(0, 2, 2, 2);
-        SuperComplex c = val.SubMatrix(2, 2, 0, 2);
-        SuperComplex d = val.SubMatrix(2, 2, 2, 2);
-
-        var k1 = (a + d) / 2;
-        var k2 = (a - d - 5 * b - 3 * c) / 2;
-        var k3 = (a - d) / 2 - b - c;
-        var k4 = (b + c) / 2;
-        return castToCoefficients(new[] { k1, k2, k3, k4 });
-    }
+    
     double[] castToCoefficients(Matrix<Complex> val)
     {
-        var a = val[0, 0];
-        var b = val[0, 1];
-        var c = val[1, 0];
-        var d = val[1, 1];
+        var coefficentsMatrix = CMatrix.Create(4,4,0);
+        coefficentsMatrix.SetColumn(0,real.ToRowMajorArray().Select(x=>new Complex(x,0)).ToArray());
+        coefficentsMatrix.SetColumn(1,imaginary.ToRowMajorArray().Select(x=>new Complex(x,0)).ToArray());
+        coefficentsMatrix.SetColumn(2,theta.ToRowMajorArray().Select(x=>new Complex(x,0)).ToArray());
+        coefficentsMatrix.SetColumn(3,mu.ToRowMajorArray().Select(x=>new Complex(x,0)).ToArray());
 
-        var k1 = (a + d) / 2;
-        var k2 = (a - d - 5 * b - 3 * c) / 2;
-        var k3 = (a - d) / 2 - b - c;
-        var k4 = (b + c) / 2;
-        return castToCoefficients(new[] { k1, k2, k3, k4 });
+        var valVec = CVector.OfArray(val.ToRowMajorArray().Cast<Complex>().ToArray());
+        return castToCoefficients(coefficentsMatrix.Solve(valVec).ToArray());
     }
     double[] castToCoefficients(Matrix<double> val)
     {
-        var a = val[0, 0];
-        var b = val[0, 1];
-        var c = val[1, 0];
-        var d = val[1, 1];
+        var coefficentsMatrix = DMatrix.Create(4,4,0);
+        coefficentsMatrix.SetColumn(0,real.ToRowMajorArray());
+        coefficentsMatrix.SetColumn(1,imaginary.ToRowMajorArray());
+        coefficentsMatrix.SetColumn(2,theta.ToRowMajorArray());
+        coefficentsMatrix.SetColumn(3,mu.ToRowMajorArray());
 
-        var k1 = (a + d) / 2;
-        var k2 = (a - d - 5 * b - 3 * c) / 2;
-        var k3 = (a - d) / 2 - b - c;
-        var k4 = (b + c) / 2;
-        return new[] { k1, k2, k3, k4 };
+        var valVec = DVector.OfArray(val.ToRowMajorArray());
+        return coefficentsMatrix.Solve(valVec).ToArray();
     }
     //these values should not be changed, so they are private
     static Matrix<double> imaginary = Imaginary;
