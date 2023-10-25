@@ -7,6 +7,50 @@ using MathNet.Numerics.Differentiation;
 /// </summary>
 public static class TaylorSeries
 {
+    
+    /// <param name="func">Function to take derivative</param>
+    /// <param name="approximationPoint">Where is approximation point</param>
+    /// <param name="epsilon">Finite difference epsilon approximation</param>
+    /// <returns>
+    /// Function that is capable of accumulating derivatives values to speed up 
+    /// computation of higher order derivative based on previous values calculated
+    /// </returns>
+    public static Func<int,double,double> BuildDerivativesAccumulator(Func<double, double> func, double approximationPoint, double epsilon){
+        Dictionary<int, Dictionary<double, double>> derivatives = new();
+
+        var precision = (int)Math.Abs(Math.Log10(epsilon));
+        //derivatives[n][x] = n'th derivative of func(x)
+        double readDer(int n, double x)
+        {
+            if(!derivatives.ContainsKey(n))
+                derivatives[n] = new();
+            x = double.Round(x, precision);
+            if(n<=0) return func(x);
+            var der = derivatives[n];
+            if (der.ContainsKey(x))
+                return der[x];
+            else{
+                var d = (readDer(n-1,x+epsilon)-readDer(n-1,x-epsilon))*0.5/epsilon;
+                der[x]=d;
+                return d;
+            }
+        }
+        return readDer;
+    }
+    public static double[] BuildSeriesCustom(Func<double, double> func, double approximationPoint, int order, double epsilon)
+    {
+        var der = BuildDerivativesAccumulator(func,approximationPoint,epsilon);
+
+        var A =
+            Enumerable.Range(1, order)
+            .Select(r => der(r, approximationPoint))
+            .Prepend(func(approximationPoint))
+            .Select((val, i) => val / SpecialFunctions.Factorial(i))
+            .ToArray();
+        return A;
+
+
+    }
     /// <summary>
     /// Etalon series builder. The slowest, but most precise.
     /// </summary>
